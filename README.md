@@ -8,7 +8,7 @@ Public web pages for Lazo share links (GitHub Pages).
   permission-gated payload. Append `?env=dev` before the `#` to hit the dev
   project while testing.
 - `index.html` — placeholder landing page.
-- `CNAME` — custom domain (lazo.co).
+- `CNAME` — custom domain (lazopet.co).
 
 This repo is public (required for free GitHub Pages); it contains no secrets —
 the Supabase project URLs are public identifiers, and redeem-share-link
