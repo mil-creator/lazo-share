@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Shared pet info — Lazo</title>
+<style>
+  :root {
+    --primary:#1F7A8C; --primary-fg:#ffffff; --accent:#F4A259;
+    --bg:#F4EFE7; --surface:#ffffff; --fg:#26221C; --muted:#6E675C;
+    --border:#E3DCD0; --success:#2E7D5B; --warning:#B26A00; --danger:#B3261E;
+    --radius:14px;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased; }
+  .wrap { max-width:640px; margin:0 auto; padding:20px 16px 64px; }
+  .brand { text-align:center; color:var(--primary); font-weight:700; font-size:22px; letter-spacing:.3px; margin:8px 0 16px; }
+  .center { text-align:center; padding:48px 16px; }
+  .spinner { width:28px; height:28px; border:3px solid var(--border); border-top-color:var(--primary);
+    border-radius:50%; margin:0 auto 12px; animation:spin .8s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .errbox { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+    padding:28px 20px; }
+  .errbox h2 { margin:0 0 8px; font-size:19px; }
+  .errbox p { margin:0; color:var(--muted); line-height:1.5; }
+  .hero { text-align:center; margin-bottom:20px; }
+  .hero img { width:112px; height:112px; border-radius:50%; object-fit:cover;
+    border:3px solid var(--surface); box-shadow:0 2px 10px rgba(0,0,0,.08); }
+  .hero .initial { width:112px; height:112px; border-radius:50%; background:var(--primary);
+    color:var(--primary-fg); font-size:44px; font-weight:600; display:flex;
+    align-items:center; justify-content:center; margin:0 auto; }
+  .hero h1 { margin:12px 0 2px; font-size:26px; }
+  .hero .sub { color:var(--muted); font-size:15px; }
+  .typechip { display:inline-block; margin-top:10px; background:var(--primary); color:var(--primary-fg);
+    font-size:13px; font-weight:600; padding:4px 12px; border-radius:999px; }
+  .expiry { color:var(--muted); font-size:12.5px; margin-top:8px; }
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+    padding:16px; margin-bottom:14px; }
+  .card h2 { margin:0 0 10px; font-size:15px; text-transform:uppercase; letter-spacing:.6px;
+    color:var(--primary); }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:8px 16px; }
+  .kv .k { font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; }
+  .kv .v { font-size:15px; font-weight:500; }
+  .item { padding:10px 0; border-bottom:1px solid var(--border); }
+  .item:last-child { border-bottom:none; padding-bottom:2px; }
+  .item .t { font-weight:600; font-size:15px; }
+  .item .d { color:var(--muted); font-size:13.5px; margin-top:2px; line-height:1.45; }
+  .sev { display:inline-block; font-size:11.5px; font-weight:700; padding:2px 8px; border-radius:999px;
+    text-transform:uppercase; letter-spacing:.4px; margin-left:6px; vertical-align:middle; }
+  .sev.life_threatening,.sev.severe,.sev.high { background:#FBE9E7; color:var(--danger); }
+  .sev.moderate,.sev.medium { background:#FFF3E0; color:var(--warning); }
+  .sev.mild,.sev.low { background:#E8F5E9; color:var(--success); }
+  .alertcard { border-left:4px solid var(--danger); }
+  .note { white-space:pre-wrap; line-height:1.5; font-size:14.5px; }
+  .doc a { color:var(--primary); font-weight:600; text-decoration:none; }
+  .doc a:hover { text-decoration:underline; }
+  .check { color:var(--success); font-weight:700; }
+  .unchecked { color:var(--muted); }
+  .footer { text-align:center; color:var(--muted); font-size:12.5px; margin-top:28px; line-height:1.6; }
+  .footer b { color:var(--primary); }
+  @media print {
+    body { background:#fff; } .card { break-inside:avoid; border-color:#ccc; }
+    .footer,.typechip { color:#555; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand">Lazo</div>
+  <div id="app">
+    <div class="center" id="loading"><div class="spinner"></div><div style="color:var(--muted)">Opening shared pet info…</div></div>
+  </div>
+  <div class="footer">Shared privately via <b>Lazo</b> — less pet-care chaos, more time being present.<br>
+  If you weren’t expecting this link, you can safely close this page.</div>
+</div>
+<script>
+(function () {
+  'use strict';
+  var PROD = 'https://cwwfinpmfmxogmuqzjif.supabase.co/functions/v1/redeem-share-link';
+  var DEV  = 'https://yhqgwndmefuxzrdgnbmp.supabase.co/functions/v1/redeem-share-link';
+  var qs = new URLSearchParams(location.search);
+  var ENDPOINT = qs.get('env') === 'dev' ? DEV : PROD;
+
+  var app = document.getElementById('app');
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+    });
+  }
+  function fmtDate(iso) {
+    if (!iso) return null;
+    try {
+      var d = iso.length <= 10 ? new Date(iso + 'T00:00:00') : new Date(iso);
+      return d.toLocaleDateString(undefined, { year:'numeric', month:'short', day:'numeric' });
+    } catch (e) { return esc(iso); }
+  }
+  function fmtDateTime(iso) {
+    if (!iso) return null;
+    try { return new Date(iso).toLocaleString(undefined, { year:'numeric', month:'short', day:'numeric', hour:'numeric', minute:'2-digit' }); }
+    catch (e) { return esc(iso); }
+  }
+  function ageFrom(iso) {
+    if (!iso) return null;
+    var p = iso.split('-').map(Number);
+    var b = new Date(p[0], p[1]-1, p[2]), n = new Date();
+    var y = n.getFullYear()-b.getFullYear(), m = n.getMonth()-b.getMonth();
+    if (n.getDate() < b.getDate()) m -= 1;
+    if (m < 0) { y -= 1; m += 12; }
+    if (y < 0) return null;
+    if (y === 0 && m === 0) return 'Under 1 month';
+    if (y === 0) return m + ' mo';
+    if (m === 0) return y + ' yr';
+    return y + ' yr ' + m + ' mo';
+  }
+  var TYPE_LABELS = {
+    caregiver_packet:'Caregiver Packet', vet_packet:'Vet Packet', emergency_profile:'Emergency Profile',
+    lost_pet_alert:'Lost Pet Alert', provider_upload:'Provider Upload', other:'Shared Pet Info'
+  };
+  var ERRORS = {
+    invalid_link: ['This link isn’t valid', 'It may have been typed incorrectly, or replaced with a newer link. Ask the pet’s owner to send you a fresh one.'],
+    link_revoked: ['This link was turned off', 'The pet’s owner revoked access. If you still need this information, ask them for a new link.'],
+    link_expired: ['This link has expired', 'Share links expire automatically for the pet’s privacy. Ask the owner to send you a fresh one.'],
+    invalid_token: ['This link isn’t valid', 'The address looks incomplete. Make sure you opened the full link.'],
+    no_token: ['No link found', 'This page needs to be opened from a Lazo share link.'],
+    network: ['Couldn’t load', 'Something went wrong reaching Lazo. Check your connection and refresh the page.']
+  };
+  function showError(code) {
+    var e = ERRORS[code] || ERRORS.network;
+    app.innerHTML = '<div class="errbox center"><h2>' + esc(e[0]) + '</h2><p>' + esc(e[1]) + '</p></div>';
+  }
+  function kv(k, v) {
+    return v === null || v === undefined || v === '' ? '' :
+      '<div class="kv"><div class="k">' + esc(k) + '</div><div class="v">' + esc(v) + '</div></div>';
+  }
+  function card(title, inner, extraClass) {
+    return inner ? '<div class="card ' + (extraClass||'') + '"><h2>' + esc(title) + '</h2>' + inner + '</div>' : '';
+  }
+  function items(arr, render) {
+    if (!arr || !arr.length) return '';
+    return arr.map(function (x) { return '<div class="item">' + render(x) + '</div>'; }).join('');
+  }
+  function sevChip(s) { return s ? '<span class="sev ' + esc(s) + '">' + esc(String(s).replace(/_/g,' ')) + '</span>' : ''; }
+
+  function render(p) {
+    var pet = p.pet || {};
+    var html = '';
+
+    // Hero
+    html += '<div class="hero">';
+    html += p.photo_url
+      ? '<img src="' + esc(p.photo_url) + '" alt="">'
+      : '<div class="initial">' + esc((pet.name || '?').charAt(0).toUpperCase()) + '</div>';
+    html += '<h1>' + esc(pet.name || 'Pet') + '</h1>';
+    var subBits = [pet.breed, pet.species, pet.sex].filter(Boolean).map(esc).join(' · ');
+    if (subBits) html += '<div class="sub">' + subBits + '</div>';
+    html += '<div><span class="typechip">' + esc(TYPE_LABELS[p.share_type] || 'Shared Pet Info') + '</span></div>';
+    if (p.expires_at) html += '<div class="expiry">Link expires ' + fmtDate(p.expires_at) + '</div>';
+    html += '</div>';
+
+    // Basics
+    var basics = '<div class="grid">' +
+      kv('Age', ageFrom(pet.birthdate)) + kv('Birthdate', fmtDate(pet.birthdate)) +
+      kv('Weight', pet.weight ? pet.weight + ' ' + (pet.weight_unit || '') : null) +
+      kv('Status', pet.status && pet.status !== 'active' ? String(pet.status).replace(/_/g,' ') : null) +
+      kv('Microchip', pet.microchip_number) + '</div>';
+    html += card('About ' + (pet.name || 'this pet'), basics);
+
+    // Allergies — most safety-critical, right under basics
+    html += card('⚠ Allergies', items(p.allergies, function (a) {
+      return '<div class="t">' + esc(a.allergy_name) + sevChip(a.severity) + '</div>' +
+        '<div class="d">' + esc(a.allergy_type || '') + (a.reaction_notes ? ' — ' + esc(a.reaction_notes) : '') + '</div>';
+    }), 'alertcard');
+
+    html += card('Medications', items(p.medications, function (m) {
+      var d = [m.dosage, m.frequency].filter(Boolean).map(esc).join(' · ');
+      return '<div class="t">' + esc(m.name) + '</div>' +
+        (d ? '<div class="d">' + d + '</div>' : '') +
+        (m.instructions ? '<div class="d">' + esc(m.instructions) + '</div>' : '') +
+        (m.notes ? '<div class="d">' + esc(m.notes) + '</div>' : '');
+    }));
+
+    if (p.owner_contact && p.owner_contact.length) {
+      html += card('Owner contact', items(p.owner_contact, function (o) {
+        return '<div class="t">' + esc(o.name) + '</div>' +
+          (o.email ? '<div class="d"><a href="mailto:' + esc(o.email) + '">' + esc(o.email) + '</a></div>' : '');
+      }));
+    }
+
+    html += card('Emergency contacts', items(p.emergency_contacts, function (c) {
+      return '<div class="t">' + esc(c.name) + (c.relationship ? ' <span class="unchecked">(' + esc(c.relationship) + ')</span>' : '') + '</div>' +
+        '<div class="d">' + [c.phone, c.email].filter(Boolean).map(esc).join(' · ') + (c.notes ? ' — ' + esc(c.notes) : '') + '</div>';
+    }));
+
+    html += card('Care team', items(p.providers, function (v) {
+      return '<div class="t">' + esc(v.name) + (v.provider_type ? ' <span class="unchecked">(' + esc(String(v.provider_type).replace(/_/g,' ')) + ')</span>' : '') + '</div>' +
+        '<div class="d">' + [v.phone, v.email, v.address, v.website].filter(Boolean).map(esc).join(' · ') + '</div>';
+    }));
+
+    if (p.personality) html += card('Personality', '<div class="note">' + esc(p.personality) + '</div>');
+    if (p.notes) html += card('Notes', '<div class="note">' + esc(p.notes) + '</div>');
+
+    if (p.care_instructions) {
+      var ci = p.care_instructions, blocks = '';
+      [['Medication notes','medication_notes'],['Routine','routine_notes'],['Behavior','behavior_notes'],['Emergency','emergency_notes'],['General','general_notes']].forEach(function (b) {
+        if (ci[b[1]]) blocks += '<div class="item"><div class="t">' + b[0] + '</div><div class="d note">' + esc(ci[b[1]]) + '</div></div>';
+      });
+      html += card('Care instructions', blocks);
+    }
+
+    html += card('Daily routine', items(p.daily_routine, function (r) {
+      return '<div class="t">' + (r.time_of_day ? esc(r.time_of_day) + ' — ' : '') + esc(r.activity) + '</div>';
+    }));
+
+    html += card('Feeding', items(p.feeding_schedules, function (f) {
+      var what = [f.food_brand, f.food_name].filter(Boolean).map(esc).join(' ');
+      var amount = f.quantity ? f.quantity + ' ' + (f.unit || '') : '';
+      return '<div class="t">' + esc(f.meal_time || 'Meal') + (amount ? ' · ' + esc(amount) : '') + '</div>' +
+        '<div class="d">' + [what, f.food_type ? String(f.food_type).replace(/_/g,' ') : ''].filter(Boolean).join(' · ') +
+        (f.special_notes ? ' — ' + esc(f.special_notes) : '') + '</div>';
+    }));
+
+    html += card('Vaccines', items(p.vaccines, function (v) {
+      var dates = [];
+      if (v.administered_date) dates.push('Given ' + fmtDate(v.administered_date));
+      if (v.expiration_date) dates.push('Expires ' + fmtDate(v.expiration_date));
+      return '<div class="t">' + esc(v.name) + '</div>' +
+        '<div class="d">' + dates.join(' · ') + (v.provider_name_text ? ' · ' + esc(v.provider_name_text) : '') +
+        (v.notes ? ' — ' + esc(v.notes) : '') + '</div>';
+    }));
+
+    html += card('Weight history', items(p.weight_history, function (w) {
+      return '<div class="t">' + esc(w.weight) + ' ' + esc(w.weight_unit || '') +
+        ' <span class="unchecked">· ' + fmtDate(w.recorded_at) + '</span></div>' +
+        (w.notes ? '<div class="d">' + esc(w.notes) + '</div>' : '');
+    }));
+
+    html += card('Recent symptoms', items(p.symptoms, function (s) {
+      return '<div class="t">' + esc(s.title) + sevChip(s.severity) + (s.is_resolved ? ' <span class="unchecked">(resolved)</span>' : '') + '</div>' +
+        '<div class="d">' + (fmtDate(s.symptom_date) || '') + (s.notes ? ' — ' + esc(s.notes) : '') + '</div>';
+    }));
+
+    html += card('Documents', items(p.documents, function (d) {
+      var title = d.url
+        ? '<a href="' + esc(d.url) + '" target="_blank" rel="noopener noreferrer">' + esc(d.title) + '</a>'
+        : esc(d.title);
+      return '<div class="t doc">' + title + '</div>' +
+        '<div class="d">' + [d.category ? String(d.category).replace(/_/g,' ') : '', d.issued_at ? 'Issued ' + fmtDate(d.issued_at) : ''].filter(Boolean).join(' · ') + '</div>';
+    }));
+
+    html += card('Upcoming reminders', items(p.reminders, function (r) {
+      return '<div class="t">' + esc(r.title) + '</div>' +
+        '<div class="d">' + (fmtDateTime(r.due_at) || '') + (r.recurrence && r.recurrence !== 'once' ? ' · repeats ' + esc(r.recurrence) : '') + '</div>';
+    }));
+
+    if (p.checklists && p.checklists.length) {
+      html += p.checklists.map(function (c) {
+        return card('Checklist — ' + c.title, items(c.items, function (i) {
+          return (i.is_completed ? '<span class="check">✓</span> ' : '<span class="unchecked">○</span> ') + esc(i.title);
+        }));
+      }).join('');
+    }
+
+    if (p.notice) html += card('Note', '<div class="note">' + esc(p.notice) + '</div>');
+
+    app.innerHTML = html;
+  }
+
+  var token = (location.hash || '').replace(/^#/, '').trim();
+  if (!token) { showError('no_token'); return; }
+  fetch(ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: token })
+  }).then(function (r) {
+    return r.json().then(function (data) {
+      if (!r.ok || data.error) showError(data.error || 'network');
+      else render(data);
+    });
+  }).catch(function () { showError('network'); });
+})();
+</script>
+</body>
+</html>
