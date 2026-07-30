@@ -54,6 +54,10 @@
   .sev.moderate,.sev.medium { background:#FFF3E0; color:var(--warning); }
   .sev.mild,.sev.low { background:#E8F5E9; color:var(--success); }
   .alertcard { border-left:4px solid var(--danger); }
+  .partialbanner { background:#FFF3E0; border:1px solid var(--warning); border-left:4px solid var(--warning);
+    border-radius:var(--radius); padding:14px 16px; margin-bottom:14px; color:var(--warning);
+    font-size:14px; font-weight:600; line-height:1.5; }
+  .noverify { color:var(--warning); font-size:13.5px; font-style:italic; }
   .note { white-space:pre-wrap; line-height:1.5; font-size:14.5px; }
   .doc a { color:var(--primary); font-weight:600; text-decoration:none; }
   .doc a:hover { text-decoration:underline; }
@@ -149,6 +153,29 @@
     var pet = p.pet || {};
     var html = '';
 
+    // SAFE-01 (F1): partial_errors lists sections whose reads failed server-side.
+    // A failed section must never look like "none" — warn up top, and keep the
+    // section header visible with an explicit "Could not be verified" note.
+    var partial = p.partial_errors || [];
+    function failed(name) { return partial.indexOf(name) !== -1; }
+    // Like card(), but a failed section renders its header + a warning note
+    // instead of disappearing. Sections with data render normally even when
+    // flagged (e.g. documents listed but a file link couldn't be generated).
+    function section(title, name, inner, extraClass) {
+      if (failed(name) && !inner) {
+        return '<div class="card ' + (extraClass||'') + '"><h2>' + esc(title) + '</h2>' +
+          '<div class="noverify">Could not be verified</div></div>';
+      }
+      return card(title, inner, extraClass);
+    }
+
+    // Warning banner — before anything else on the page.
+    if (partial.length) {
+      var names = partial.map(function (n) { return esc(String(n).replace(/_/g, ' ')); }).join(', ');
+      html += '<div class="partialbanner">⚠️ Some information could not be verified when this page was generated: ' +
+        names + '. Do not treat missing sections as \'none.\'</div>';
+    }
+
     // Hero
     html += '<div class="hero">';
     html += p.photo_url
@@ -170,12 +197,12 @@
     html += card('About ' + (pet.name || 'this pet'), basics);
 
     // Allergies — most safety-critical, right under basics
-    html += card('⚠ Allergies', items(p.allergies, function (a) {
+    html += section('⚠ Allergies', 'allergies', items(p.allergies, function (a) {
       return '<div class="t">' + esc(a.allergy_name) + sevChip(a.severity) + '</div>' +
         '<div class="d">' + esc(a.allergy_type || '') + (a.reaction_notes ? ' — ' + esc(a.reaction_notes) : '') + '</div>';
     }), 'alertcard');
 
-    html += card('Medications', items(p.medications, function (m) {
+    html += section('Medications', 'medications', items(p.medications, function (m) {
       var d = [m.dosage, m.frequency].filter(Boolean).map(esc).join(' · ');
       return '<div class="t">' + esc(m.name) + '</div>' +
         (d ? '<div class="d">' + d + '</div>' : '') +
@@ -183,27 +210,29 @@
         (m.notes ? '<div class="d">' + esc(m.notes) + '</div>' : '');
     }));
 
-    if (p.owner_contact && p.owner_contact.length) {
-      html += card('Owner contact', items(p.owner_contact, function (o) {
-        return '<div class="t">' + esc(o.name) + '</div>' +
-          (o.email ? '<div class="d"><a href="mailto:' + esc(o.email) + '">' + esc(o.email) + '</a></div>' : '');
-      }));
-    }
+    html += section('Owner contact', 'owner_contact', items(p.owner_contact, function (o) {
+      return '<div class="t">' + esc(o.name) + '</div>' +
+        (o.email ? '<div class="d"><a href="mailto:' + esc(o.email) + '">' + esc(o.email) + '</a></div>' : '');
+    }));
 
-    html += card('Emergency contacts', items(p.emergency_contacts, function (c) {
+    html += section('Emergency contacts', 'emergency_contacts', items(p.emergency_contacts, function (c) {
       return '<div class="t">' + esc(c.name) + (c.relationship ? ' <span class="unchecked">(' + esc(c.relationship) + ')</span>' : '') + '</div>' +
         '<div class="d">' + [c.phone, c.email].filter(Boolean).map(esc).join(' · ') + (c.notes ? ' — ' + esc(c.notes) : '') + '</div>';
     }));
 
-    html += card('Care team', items(p.providers, function (v) {
+    html += section('Care team', 'providers', items(p.providers, function (v) {
       return '<div class="t">' + esc(v.name) + (v.provider_type ? ' <span class="unchecked">(' + esc(String(v.provider_type).replace(/_/g,' ')) + ')</span>' : '') + '</div>' +
         '<div class="d">' + [v.phone, v.email, v.address, v.website].filter(Boolean).map(esc).join(' · ') + '</div>';
     }));
 
-    if (p.personality) html += card('Personality', '<div class="note">' + esc(p.personality) + '</div>');
-    if (p.notes) html += card('Notes', '<div class="note">' + esc(p.notes) + '</div>');
+    if (failed('personality')) html += section('Personality', 'personality', '');
+    else if (p.personality) html += card('Personality', '<div class="note">' + esc(p.personality) + '</div>');
+    if (failed('notes')) html += section('Notes', 'notes', '');
+    else if (p.notes) html += card('Notes', '<div class="note">' + esc(p.notes) + '</div>');
 
-    if (p.care_instructions) {
+    if (failed('care_instructions')) {
+      html += section('Care instructions', 'care_instructions', '');
+    } else if (p.care_instructions) {
       var ci = p.care_instructions, blocks = '';
       [['Medication notes','medication_notes'],['Routine','routine_notes'],['Behavior','behavior_notes'],['Emergency','emergency_notes'],['General','general_notes']].forEach(function (b) {
         if (ci[b[1]]) blocks += '<div class="item"><div class="t">' + b[0] + '</div><div class="d note">' + esc(ci[b[1]]) + '</div></div>';
@@ -211,11 +240,11 @@
       html += card('Care instructions', blocks);
     }
 
-    html += card('Daily routine', items(p.daily_routine, function (r) {
+    html += section('Daily routine', 'daily_routine', items(p.daily_routine, function (r) {
       return '<div class="t">' + (r.time_of_day ? esc(r.time_of_day) + ' — ' : '') + esc(r.activity) + '</div>';
     }));
 
-    html += card('Feeding', items(p.feeding_schedules, function (f) {
+    html += section('Feeding', 'feeding_schedules', items(p.feeding_schedules, function (f) {
       var what = [f.food_brand, f.food_name].filter(Boolean).map(esc).join(' ');
       var amount = f.quantity ? f.quantity + ' ' + (f.unit || '') : '';
       return '<div class="t">' + esc(f.meal_time || 'Meal') + (amount ? ' · ' + esc(amount) : '') + '</div>' +
@@ -223,7 +252,7 @@
         (f.special_notes ? ' — ' + esc(f.special_notes) : '') + '</div>';
     }));
 
-    html += card('Vaccines', items(p.vaccines, function (v) {
+    html += section('Vaccines', 'vaccines', items(p.vaccines, function (v) {
       var dates = [];
       if (v.administered_date) dates.push('Given ' + fmtDate(v.administered_date));
       if (v.expiration_date) dates.push('Expires ' + fmtDate(v.expiration_date));
@@ -232,18 +261,18 @@
         (v.notes ? ' — ' + esc(v.notes) : '') + '</div>';
     }));
 
-    html += card('Weight history', items(p.weight_history, function (w) {
+    html += section('Weight history', 'weight_history', items(p.weight_history, function (w) {
       return '<div class="t">' + esc(w.weight) + ' ' + esc(w.weight_unit || '') +
         ' <span class="unchecked">· ' + fmtDate(w.recorded_at) + '</span></div>' +
         (w.notes ? '<div class="d">' + esc(w.notes) + '</div>' : '');
     }));
 
-    html += card('Recent symptoms', items(p.symptoms, function (s) {
+    html += section('Recent symptoms', 'symptoms', items(p.symptoms, function (s) {
       return '<div class="t">' + esc(s.title) + sevChip(s.severity) + (s.is_resolved ? ' <span class="unchecked">(resolved)</span>' : '') + '</div>' +
         '<div class="d">' + (fmtDate(s.symptom_date) || '') + (s.notes ? ' — ' + esc(s.notes) : '') + '</div>';
     }));
 
-    html += card('Documents', items(p.documents, function (d) {
+    html += section('Documents', 'documents', items(p.documents, function (d) {
       var title = d.url
         ? '<a href="' + esc(d.url) + '" target="_blank" rel="noopener noreferrer">' + esc(d.title) + '</a>'
         : esc(d.title);
@@ -251,12 +280,14 @@
         '<div class="d">' + [d.category ? String(d.category).replace(/_/g,' ') : '', d.issued_at ? 'Issued ' + fmtDate(d.issued_at) : ''].filter(Boolean).join(' · ') + '</div>';
     }));
 
-    html += card('Upcoming reminders', items(p.reminders, function (r) {
+    html += section('Upcoming reminders', 'reminders', items(p.reminders, function (r) {
       return '<div class="t">' + esc(r.title) + '</div>' +
         '<div class="d">' + (fmtDateTime(r.due_at) || '') + (r.recurrence && r.recurrence !== 'once' ? ' · repeats ' + esc(r.recurrence) : '') + '</div>';
     }));
 
-    if (p.checklists && p.checklists.length) {
+    if (failed('checklists')) {
+      html += section('Checklists', 'checklists', '');
+    } else if (p.checklists && p.checklists.length) {
       html += p.checklists.map(function (c) {
         return card('Checklist — ' + c.title, items(c.items, function (i) {
           return (i.is_completed ? '<span class="check">✓</span> ' : '<span class="unchecked">○</span> ') + esc(i.title);
