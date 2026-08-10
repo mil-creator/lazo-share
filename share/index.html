@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-J4cDmUB4OZomf+D/fwPIWyGFVc8O5cOQdNG43HnWyug='; style-src 'unsafe-inline'; img-src 'self' data: https://*.supabase.co; connect-src https://*.supabase.co; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-fWLUmr6hP1ouHwCJAhYa5pwmeXbNzw6Q0ZduYflhMqY='; style-src 'unsafe-inline'; img-src 'self' data: https://*.supabase.co; connect-src https://*.supabase.co; base-uri 'none'; form-action 'none'; object-src 'none'">
 <meta name="referrer" content="no-referrer">
 <title>Shared pet info — Lazo</title>
 <style>
@@ -142,6 +142,11 @@
     return v === null || v === undefined || v === '' ? '' :
       '<div class="kv"><div class="k">' + esc(k) + '</div><div class="v">' + esc(v) + '</div></div>';
   }
+  function safeUrl(u) { return typeof u === 'string' && /^https?:\/\//i.test(u) ? u : null; }
+  function kvLink(k, url, label) {
+    var u = safeUrl(url);
+    return u ? '<div class="kv"><div class="k">' + esc(k) + '</div><div class="v"><a href="' + esc(u) + '" target="_blank" rel="noopener noreferrer">' + esc(label) + '</a></div></div>' : '';
+  }
   function card(title, inner, extraClass) {
     return inner ? '<div class="card ' + (extraClass||'') + '"><h2>' + esc(title) + '</h2>' + inner + '</div>' : '';
   }
@@ -195,7 +200,9 @@
       kv('Age', ageFrom(pet.birthdate)) + kv('Birthdate', fmtDate(pet.birthdate)) +
       kv('Weight', pet.weight ? pet.weight + ' ' + (pet.weight_unit || '') : null) +
       kv('Status', pet.status && pet.status !== 'active' ? String(pet.status).replace(/_/g,' ') : null) +
-      kv('Microchip', pet.microchip_number) + '</div>';
+      kv('Microchip', pet.microchip_number) +
+      kv('Registry', pet.microchip_provider) +
+      kvLink('Registry link', pet.microchip_registry_url, 'Look up') + '</div>';
     html += card('About ' + (pet.name || 'this pet'), basics);
 
     // Allergies — most safety-critical, right under basics
