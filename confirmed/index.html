@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<!--
+  /confirmed — the landing page for Supabase Auth email links (D14).
+
+  WHY THIS EXISTS: the project's Site URL was still the Supabase default
+  localhost:3000, so every confirmation email ended at "This site can't be
+  reached". The confirmation itself always worked — the link hits Supabase's
+  verify endpoint first and only then redirects here — but a new tester has no
+  way to know that, and reasonably concludes signup failed.
+
+  DELIBERATELY NO DEEP LINK: an "Open Lazo" lazopet:// button is tempting, but
+  it fails on desktop and errors on a phone without the app. This page is
+  reached at the least forgiving moment in the product, so it is built to be
+  unbreakable rather than clever. Deep-linking email destinations belongs with
+  F2b / Universal Links.
+
+  The script is a same-origin FILE, not inline, so the CSP needs 'self' rather
+  than a sha256 hash. Inline-with-hash is what the share portal does, and
+  recomputing that hash after an edit has already been a trap on this project
+  once. A file has no hash to forget.
+-->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- NO frame-ancestors here on purpose: it is SILENTLY IGNORED when CSP is
+     delivered via <meta>, which is the only mechanism GitHub Pages allows.
+     Clickjacking protection for lazopet.co comes from the Cloudflare Response
+     Header Transform Rule (X-Frame-Options: DENY), added 2026-08-10 after the
+     share portal was found to have a CSP that read as complete and protected
+     nothing. Listing a directive that does nothing is how that happened. -->
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<meta name="robots" content="noindex">
+<title>Lazo</title>
+<style>
+  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
+       background:#F4EFE7;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+       color:#26221C;text-align:center;padding:24px;box-sizing:border-box}
+  .wrap{max-width:420px}
+  .brand{color:#1F7A8C;font-size:34px;font-weight:600;margin:0 0 28px}
+  h1{font-size:22px;font-weight:600;margin:0 0 10px;line-height:1.3}
+  p{color:#6E675C;margin:0;line-height:1.55}
+  .alt{margin-top:22px;padding-top:22px;border-top:1px solid #E2DACE}
+  .alt h2{font-size:17px;font-weight:600;margin:0 0 8px;color:#26221C}
+  .alt p{font-size:15px}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand">Lazo</div>
+
+  <!-- Default state. Chosen because a valid link is the overwhelmingly common
+       case; the script below swaps it out when Supabase reports an error. If
+       the script fails AND the link was expired, the sign-in screen still tells
+       the truth. -->
+  <div id="ok">
+    <h1>Tu correo está confirmado</h1>
+    <p>Ya puedes abrir Lazo e iniciar sesión.</p>
+    <div class="alt">
+      <h2>Your email is confirmed</h2>
+      <p>You can now open Lazo and sign in.</p>
+    </div>
+  </div>
+
+  <div id="err" class="hidden">
+    <h1>Ese enlace ya no sirve</h1>
+    <p>Puede haber vencido o ya fue usado. Abre Lazo y pide uno nuevo.</p>
+    <div class="alt">
+      <h2>That link didn’t work</h2>
+      <p>It may have expired or already been used. Open Lazo and request a new one.</p>
+    </div>
+  </div>
+</div>
+<script src="confirm.js"></script>
+</body>
+</html>
